@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理 - MediaAI Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .provider-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .provider-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .provider-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .provider-card.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea10, #764ba210);
+        }
+
+        .provider-card.active::after {
+            content: '✓';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .provider-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .provider-desc {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .provider-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-enabled {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status-disabled {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-hint {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .config-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .config-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .config-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-info-label {
+            font-weight: 500;
+            color: #666;
+        }
+
+        .config-info-value {
+            color: #333;
+            font-family: monospace;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回主页</a>
+        
+        <div class="header">
+            <h1>⚙️ 配置管理</h1>
+            <p>选择 LLM 提供商并配置参数</p>
+        </div>
+
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-error" id="errorAlert"></div>
+        <div class="alert alert-info" id="infoAlert"></div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>加载中...</p>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">选择 LLM 提供商</h2>
+            
+            <div class="provider-grid">
+                <div class="provider-card" data-provider="deepseek" onclick="selectProvider('deepseek')">
+                    <div class="provider-name">DeepSeek API</div>
+                    <div class="provider-desc">在线推理，效果最好，价格便宜（1元=100万token）</div>
+                    <span class="provider-status status-disabled" id="status-deepseek">未启用</span>
+                </div>
+
+                <div class="provider-card" data-provider="local_qwen" onclick="selectProvider('local_qwen')">
+                    <div class="provider-name">Qwen2 本地</div>
+                    <div class="provider-desc">本地运行，纯文本模型，适合字幕处理</div>
+                    <span class="provider-status status-disabled" id="status-local_qwen">未启用</span>
+                </div>
+
+                <div class="provider-card" data-provider="openai" onclick="selectProvider('openai')">
+                    <div class="provider-name">OpenAI API</div>
+                    <div class="provider-desc">GPT-4o, 效果极佳, 价格较高</div>
+                    <span class="provider-status status-disabled" id="status-openai">未启用</span>
+                </div>
+
+                <div class="provider-card" data-provider="qwen" onclick="selectProvider('qwen')">
+                    <div class="provider-name">通义千问 API</div>
+                    <div class="provider-desc">阿里云在线服务</div>
+                    <span class="provider-status status-disabled" id="status-qwen">未启用</span>
+                </div>
+            </div>
+
+            <div id="configForm">
+                <!-- DeepSeek 配置 -->
+                <div class="provider-config" id="config-deepseek" style="display: none;">
+                    <h3>DeepSeek 配置</h3>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="deepseek-api-key" placeholder="sk-...">
+                        <div class="form-hint">从 https://platform.deepseek.com 获取</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Base URL</label>
+                        <input type="text" id="deepseek-base-url" value="https://api.deepseek.com">
+                    </div>
+                    <div class="form-group">
+                        <label>模型</label>
+                        <select id="deepseek-model">
+                            <option value="deepseek-chat">deepseek-chat</option>
+                            <option value="deepseek-reasoner">deepseek-reasoner</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Local Qwen 配置 -->
+                <div class="provider-config" id="config-local_qwen" style="display: none;">
+                    <h3>Qwen2 本地配置</h3>
+                    <div class="form-group">
+                        <label>模型路径</label>
+                        <select id="local-qwen-model">
+                            <option value="Qwen/Qwen2-1.5B-Instruct">Qwen2-1.5B-Instruct(推荐)</option>
+                            <option value="Qwen/Qwen2-7B-Instruct">Qwen2-7B-Instruct</option>
+                            <option value="Qwen/Qwen2-VL-2B-Instruct">Qwen2-VL-2B-Instruct(视觉模型)</option>
+                        </select>
+                        <div class="form-hint">选择已下载的模型</div>
+                    </div>
+                    <div class="form-group">
+                        <label>设备</label>
+                        <select id="local-qwen-device">
+                            <option value="auto">自动检测</option>
+                            <option value="cuda">CUDA (GPU)</option>
+                            <option value="cpu">CPU</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- OpenAI 配置 -->
+                <div class="provider-config" id="config-openai" style="display: none;">
+                    <h3>OpenAI 配置</h3>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="openai-api-key" placeholder="sk-...">
+                        <div class="form-hint">从 https://platform.openai.com 获取</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Base URL（可选）</label>
+                        <input type="text" id="openai-base-url" placeholder="留空使用默认">
+                        <div class="form-hint">如使用代理或镜像服务，填写此项</div>
+                    </div>
+                    <div class="form-group">
+                        <label>模型</label>
+                        <select id="openai-model">
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4o-mini">GPT-4o-mini</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5-turbo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Qwen API 配置 -->
+                <div class="provider-config" id="config-qwen" style="display: none;">
+                    <h3>通义千问 API 配置</h3>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" id="qwen-api-key" placeholder="sk-...">
+                        <div class="form-hint">从阿里云控制台获取</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Base URL</label>
+                        <input type="text" id="qwen-base-url" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>模型</label>
+                        <select id="qwen-model">
+                            <option value="qwen-turbo">qwen-turbo</option>
+                            <option value="qwen-plus">qwen-plus</option>
+                            <option value="qwen-max">qwen-max</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveConfig()">💾 保存配置</button>
+                <button class="btn btn-secondary" onclick="testConnection()">🔗 测试连接</button>
+                <button class="btn btn-secondary" onclick="loadConfig()">🔄 刷新</button>
+            </div>
+
+            <div class="config-info">
+                <div class="config-info-item">
+                    <span class="config-info-label">当前提供商:</span>
+                    <span class="config-info-value" id="current-provider">-</span>
+                </div>
+                <div class="config-info-item">
+                    <span class="config-info-label">配置文件:</span>
+                    <span class="config-info-value">src/config/config.yaml</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let currentProvider = null;
+        let currentConfig = null;
+
+        // 页面加载时获取配置
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+        });
+
+        // 加载配置
+        async function loadConfig() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm`);
+                const data = await response.json();
+                
+                currentConfig = data;
+                updateUI(data);
+                showSuccess('配置加载成功');
+            } catch (error) {
+                showError('加载配置失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 更新 UI
+        function updateUI(data) {
+            // 更新提供商状态
+            for (const provider of ['deepseek', 'local_qwen', 'openai', 'qwen']) {
+                const enabled = data.providers[provider]?.enabled || false;
+                const statusEl = document.getElementById(`status-${provider}`);
+                const cardEl = document.querySelector(`[data-provider="${provider}"]`);
+                
+                if (enabled) {
+                    statusEl.textContent = '已启用';
+                    statusEl.className = 'provider-status status-enabled';
+                    cardEl.classList.add('active');
+                    currentProvider = provider;
+                    document.getElementById('current-provider').textContent = provider;
+                } else {
+                    statusEl.textContent = '未启用';
+                    statusEl.className = 'provider-status status-disabled';
+                    cardEl.classList.remove('active');
+                }
+            }
+
+            // 填充配置值
+            if (data.providers.deepseek) {
+                document.getElementById('deepseek-api-key').value = data.providers.deepseek.api_key || '';
+                document.getElementById('deepseek-base-url').value = data.providers.deepseek.base_url || '';
+                document.getElementById('deepseek-model').value = data.providers.deepseek.model || 'deepseek-chat';
+            }
+
+            if (data.providers.local_qwen) {
+                document.getElementById('local-qwen-model').value = data.providers.local_qwen.model_path || '';
+                document.getElementById('local-qwen-device').value = data.providers.local_qwen.device || 'auto';
+            }
+
+            if (data.providers.openai) {
+                document.getElementById('openai-api-key').value = data.providers.openai.api_key || '';
+                document.getElementById('openai-base-url').value = data.providers.openai.base_url || '';
+                document.getElementById('openai-model').value = data.providers.openai.model || 'gpt-4o';
+            }
+
+            if (data.providers.qwen) {
+                document.getElementById('qwen-api-key').value = data.providers.qwen.api_key || '';
+                document.getElementById('qwen-base-url').value = data.providers.qwen.base_url || '';
+                document.getElementById('qwen-model').value = data.providers.qwen.model || 'qwen-turbo';
+            }
+        }
+
+        // 选择提供商
+        function selectProvider(provider) {
+            // 隐藏所有配置表单
+            document.querySelectorAll('.provider-config').forEach(el => el.style.display = 'none');
+            
+            // 显示选中的配置表单
+            document.getElementById(`config-${provider}`).style.display = 'block';
+            
+            currentProvider = provider;
+        }
+
+        // 保存配置
+        async function saveConfig() {
+            if (!currentProvider) {
+                showError('请先选择一个 LLM 提供商');
+                return;
+            }
+
+            showLoading(true);
+
+            const config = {
+                provider: currentProvider
+            };
+
+            // 收集配置参数
+            if (currentProvider === 'deepseek') {
+                config.api_key = document.getElementById('deepseek-api-key').value;
+                config.base_url = document.getElementById('deepseek-base-url').value;
+                config.model = document.getElementById('deepseek-model').value;
+            } else if (currentProvider === 'local_qwen') {
+                config.model_path = document.getElementById('local-qwen-model').value;
+                config.device = document.getElementById('local-qwen-device').value;
+            } else if (currentProvider === 'openai') {
+                config.api_key = document.getElementById('openai-api-key').value;
+                config.base_url = document.getElementById('openai-base-url').value || null;
+                config.model = document.getElementById('openai-model').value;
+            } else if (currentProvider === 'qwen') {
+                config.api_key = document.getElementById('qwen-api-key').value;
+                config.base_url = document.getElementById('qwen-base-url').value;
+                config.model = document.getElementById('qwen-model').value;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('配置保存成功！');
+                    setTimeout(() => loadConfig(), 1000);
+                } else {
+                    showError('保存失败: ' + data.detail);
+                }
+            } catch (error) {
+                showError('保存配置失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 测试连接
+        async function testConnection() {
+            if (!currentProvider) {
+                showError('请先选择并保存配置');
+                return;
+            }
+
+            showLoading(true);
+            showInfo('正在测试连接...');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/config/llm/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ provider: currentProvider })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showSuccess(`连接测试成功！响应时间: ${data.response_time}ms`);
+                } else {
+                    showError('连接测试失败: ' + (data.error || data.detail));
+                }
+            } catch (error) {
+                showError('测试失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 显示/隐藏加载动画
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // 显示成功消息
+        function showSuccess(message) {
+            hideAllAlerts();
+            const alert = document.getElementById('successAlert');
+            alert.textContent = '✓ ' + message;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 5000);
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            hideAllAlerts();
+            const alert = document.getElementById('errorAlert');
+            alert.textContent = '✗ ' + message;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 8000);
+        }
+
+        // 显示信息消息
+        function showInfo(message) {
+            hideAllAlerts();
+            const alert = document.getElementById('infoAlert');
+            alert.textContent = 'ℹ ' + message;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 3000);
+        }
+
+        // 隐藏所有提示
+        function hideAllAlerts() {
+            document.querySelectorAll('.alert').forEach(el => el.style.display = 'none');
+        }
+    </script>
+</body>
+</html>

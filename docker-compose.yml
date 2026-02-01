@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  mediaai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mediaai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+      - ./src/config:/app/src/config
+      - ./logs:/app/logs
+      - model-cache:/root/.cache/huggingface
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_HOME=/root/.cache/huggingface
+      - PYTHONPATH=/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    command: python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - mediaai-network
+
+volumes:
+  model-cache:
+    driver: local
+
+networks:
+  mediaai-network:
+    driver: bridge
+
+    driver: bridge

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaAI Tools - AI 视频处理助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        
+        .header-left p {
+            opacity: 0.9;
+            font-size: 0.95em;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .header-btn {
+            color: white;
+            text-decoration: none;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .chat-section {
+            margin-bottom: 20px;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+        }
+        
+        .input-wrapper label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+        
+        .text-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1em;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            transition: border-color 0.3s;
+        }
+        
+        .text-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .send-btn {
+            padding: 15px 35px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 120px;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .examples {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .examples-title {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .example-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .example-tag {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            font-size: 0.85em;
+            color: #667eea;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .example-tag:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .result-section {
+            margin-top: 30px;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .result-box.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .status-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .status-icon {
+            font-size: 1.2em;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+        
+        .status-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 8px;
+        }
+        
+        .result-content {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result-success {
+            border-left-color: #4caf50;
+        }
+        
+        .result-error {
+            border-left-color: #f44336;
+        }
+        
+        .result-title {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .result-message {
+            color: #666;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .result-files {
+            margin-top: 15px;
+        }
+        
+        .result-file-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        
+        .result-file-icon {
+            font-size: 1.5em;
+        }
+        
+        .result-file-info {
+            flex: 1;
+        }
+        
+        .result-file-name {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .result-file-path {
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 2px;
+        }
+        
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>🤖 MediaAI 智能助手</h1>
+                <p>用自然语言描述您的需求,AI 帮您完成视频处理</p>
+            </div>
+            <div class="header-right">
+                <a href="config.html" class="header-btn">⚙️ LLM 配置</a>
+                <button class="header-btn" onclick="window.open('/docs', '_blank')">📖 API 文档</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- 输入区域 -->
+            <div class="chat-section">
+                <div class="input-area">
+                    <div class="input-wrapper">
+                        <label for="userInput">💬 输入您的指令（支持自然语言)</label>
+                        <textarea 
+                            id="userInput" 
+                            class="text-input" 
+                            placeholder="例如：帮我把 D:\videos 目录下的所有 MP4 文件添加字幕"
+                            onkeydown="handleKeyPress(event)"
+                        ></textarea>
+                    </div>
+                    <button class="send-btn" onclick="processCommand()" id="sendBtn">
+                        发送🚀
+                    </button>
+                </div>
+                
+                <!-- 示例指令 -->
+                <div class="examples">
+                    <div class="examples-title">💡 快速示例（点击使用）</div>
+                    <div class="example-tags">
+                        <span class="example-tag" onclick="useExample(this)">帮我把 D:\\test\\video.mp4 添加中英双语字幕</span>
+                        <span class="example-tag" onclick="useExample(this)">把 D:\\input 目录下的视频全部转换为 1080p</span>
+                        <span class="example-tag" onclick="useExample(this)">把 D:\\myvideo.mp4 生成字幕并嵌入视频</span>
+                        <span class="example-tag" onclick="useExample(this)">把 D:\\images 目录下的图片调整为 9:16 竖屏</span>
+                        <span class="example-tag" onclick="useExample(this)">切换到DeepSeek 模型</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <!-- 结果显示区域 -->
+            <div class="result-section">
+                <div id="resultBox" class="result-box">
+                    <div class="status-header">
+                        <span class="status-icon" id="statusIcon">⌛</span>
+                        <span id="statusTitle">处理中...</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="status-text" id="statusText">正在初始化...</div>
+                    
+                    <div id="resultContent" class="result-content" style="display: none;">
+                        <div class="result-title" id="resultTitle"></div>
+                        <div class="result-message" id="resultMessage"></div>
+                        <div class="result-files" id="resultFiles"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';  // 使用相对路径
+        let currentTaskId = null;
+        let pollingInterval = null;
+
+        function useExample(element) {
+            document.getElementById('userInput').value = element.textContent;
+            document.getElementById('userInput').focus();
+        }
+
+        function handleKeyPress(event) {
+            if (event.ctrlKey && event.key === 'Enter') {
+                processCommand();
+            }
+        }
+
+        async function processCommand() {
+            const input = document.getElementById('userInput').value.trim();
+            if (!input) {
+                alert('请输入指令');
+                return;
+            }
+
+            const sendBtn = document.getElementById('sendBtn');
+            const resultBox = document.getElementById('resultBox');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusText = document.getElementById('statusText');
+            const progressFill = document.getElementById('progressFill');
+            const resultContent = document.getElementById('resultContent');
+
+            // 显示处理状态
+            resultBox.classList.add('show');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '处理中...';
+            statusIcon.textContent = '⌛';
+            statusTitle.textContent = '正在处理您的请求...';
+            statusText.textContent = input;
+            progressFill.style.width = '20%';
+            resultContent.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/agent/process`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ instruction: input })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.task_id) {
+                    // 有任务ID，开始轮询状态
+                    currentTaskId = data.task_id;
+                    pollTaskStatus(data.task_id);
+                } else if (data.success) {
+                    // 直接返回结果
+                    showResult(data);
+                } else {
+                    throw new Error(data.message || '处理失败');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || '请求失败，请检查网络连接');
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送🚀';
+            }
+        }
+
+        function pollTaskStatus(taskId) {
+            const statusText = document.getElementById('statusText');
+            const progressFill = document.getElementById('progressFill');
+            
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/tasks/${taskId}`);
+                    const data = await response.json();
+                    
+                    // 更新进度
+                    const progress = data.progress || 0;
+                    progressFill.style.width = `${progress}%`;
+                    statusText.textContent = data.status || '处理中...';
+                    
+                    // 检查是否完成
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(pollingInterval);
+                        showResult(data);
+                        document.getElementById('sendBtn').disabled = false;
+                        document.getElementById('sendBtn').textContent = '发送🚀';
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 1000);
+        }
+
+        function showResult(data) {
+            const statusIcon = document.getElementById('statusIcon');
+            const statusTitle = document.getElementById('statusTitle');
+            const resultContent = document.getElementById('resultContent');
+            const resultTitle = document.getElementById('resultTitle');
+            const resultMessage = document.getElementById('resultMessage');
+            const resultFiles = document.getElementById('resultFiles');
+            const progressFill = document.getElementById('progressFill');
+
+            progressFill.style.width = '100%';
+
+            if (data.success || data.status === 'completed') {
+                statusIcon.textContent = '✅';
+                statusTitle.textContent = '处理完成';
+                resultContent.className = 'result-content result-success';
+                resultTitle.textContent = '成功';
+                
+                // 显示结果消息
+                let message = data.result?.message || data.message || '任务完成';
+                if (data.result?.output_path) {
+                    message += `\n\n输出路径: ${data.result.output_path}`;
+                }
+                resultMessage.textContent = message;
+
+                // 显示输出文件
+                if (data.result?.output_path || data.result?.srt_path) {
+                    const files = [];
+                    if (data.result.output_path) files.push({ name: '输出文件', path: data.result.output_path });
+                    if (data.result.srt_path) files.push({ name: '字幕文件', path: data.result.srt_path });
+                    
+                    resultFiles.innerHTML = files.map(file => `
+                        <div class="result-file-item">
+                            <span class="result-file-icon">📄</span>
+                            <div class="result-file-info">
+                                <div class="result-file-name">${file.name}</div>
+                                <div class="result-file-path">${file.path}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                statusIcon.textContent = '❌';
+                statusTitle.textContent = '处理失败';
+                resultContent.className = 'result-content result-error';
+                resultTitle.textContent = '错误';
+                resultMessage.textContent = data.error || data.message || '未知错误';
+                resultFiles.innerHTML = '';
+            }
+
+            resultContent.style.display = 'block';
+        }
+
+        function showError(message) {
+            const statusIcon = document.getElementById('statusIcon');
+            const statusTitle = document.getElementById('statusTitle');
+            const resultContent = document.getElementById('resultContent');
+            const resultTitle = document.getElementById('resultTitle');
+            const resultMessage = document.getElementById('resultMessage');
+            const progressFill = document.getElementById('progressFill');
+
+            statusIcon.textContent = '❌';
+            statusTitle.textContent = '请求失败';
+            resultContent.className = 'result-content result-error';
+            resultContent.style.display = 'block';
+            resultTitle.textContent = '错误';
+            resultMessage.textContent = message;
+            progressFill.style.width = '0%';
+        }
+
+        // 页面加载时检查API健康状态
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    console.log('✅ API 服务连接正常');
+                } else {
+                    console.warn('⚠️ API 服务响应异常');
+                }
+            } catch (error) {
+                console.error('❌ 无法连接到 API 服务');
+            }
+        });
+    </script>
+</body>
+</html>

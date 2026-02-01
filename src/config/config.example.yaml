@@ -1,0 +1,74 @@
+# MediaAITools Configuration File
+
+# LLM Configuration
+llm:
+  # OpenAI Configuration
+  openai:
+    api_key: "your-openai-api-key"
+    model: "gpt-4o"
+    base_url: null  # null for default, or custom endpoint
+  
+  # DeepSeek Configuration
+  deepseek:
+    api_key: "your-deepseek-api-key"
+    model: "deepseek-chat"
+    base_url: "https://api.deepseek.com"
+  
+  # 千问 Configuration
+  qwen:
+    api_key: "your-qwen-api-key"
+    model: "qwen-turbo"
+    base_url: "https://dashscope.aliyuncs.com"
+  
+  # Default model for different tasks
+  default_models:
+    video_understanding: "openai"  # Use OpenAI for complex video understanding
+    subtitle_translation: "deepseek"  # Use DeepSeek for translation
+    chinese_processing: "qwen"  # Use Qwen for Chinese content
+
+# MCP Server Configuration
+mcp:
+  host: "localhost"
+  port: 8000
+  timeout: 300  # seconds
+
+# Media Processing Configuration
+media:
+  # FFmpeg paths (leave empty for auto-detection)
+  ffmpeg_path: ""
+  ffprobe_path: ""
+  
+  # Default output settings
+  default_output_format: "mp4"
+  default_resolution: "1080p"
+  default_bitrate: "5000k"
+  
+  # Whisper Configuration
+  whisper:
+    model: "base"  # tiny, base, small, medium, large
+    device: "cpu"  # cpu or cuda
+    language: "zh"  # null for auto-detect
+
+# Storage Configuration
+storage:
+  temp_dir: "./temp"
+  output_dir: "./output"
+  max_file_size: 10737418240  # 10GB in bytes
+
+# Agent Configuration
+agent:
+  # Max retry attempts
+  max_retries: 3
+  
+  # Timeout for agent operations (seconds)
+  operation_timeout: 600
+  
+  # Enable verbose logging
+  verbose: true
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/mediaai.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
