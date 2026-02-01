@@ -5,7 +5,7 @@
 现在您可以通过网页前端直接配置和切换 LLM 提供商，无需手动编辑配置文件。支持：
 
 - ✅ **DeepSeek API** - 在线推理，性价比最高
-- ✅ **Qwen1.5 本地** - 本地纯文本模型，适合字幕处理
+- ✅ **Qwen2 本地** - 本地纯文本模型，适合字幕处理
 - ✅ **OpenAI API** - GPT-4o，效果最佳
 - ✅ **通义千问 API** - 阿里云在线服务
 
@@ -277,3 +277,4 @@ curl -X POST http://localhost:8000/api/config/llm/test \
 - 日志文件：`src/logs/mediaai.log`
 - 错误诊断：`doc/Qwen2-VL问题分析.md`
 - 内存优化：`doc/Windows内存优化指南.md`
+
