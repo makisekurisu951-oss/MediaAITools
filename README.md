@@ -86,7 +86,7 @@ docker-compose up -d
 </td>
 <td width="50%">
 
-<img src="docs/screenshots/web-ui.png" alt="Web UI" />
+<img src="doc/screenshots/web-ui.png" alt="Web UI" />
 
 *在输入框中用自然语言描述需求，AI自动完成处理*
 

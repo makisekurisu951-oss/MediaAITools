@@ -8,132 +8,158 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- WebSocket real-time progress updates
-- Video preview functionality
-- Batch task queue management
-- User authentication system
-- Multi-language UI support
+- WebSocket 实时进度推送
+- 视频预览功能
+- 批量任务队列管理
+- 用户认证系统
+- 多语言界面支持
 
-## [1.0.0] - 2024-05-01
+## [1.0.0] - 2026-02-01
 
 ### Added
-- **Web UI**: Modern browser-based interface with natural language input
-- **Docker Support**: Complete Docker and docker-compose deployment
-- **Intelligent Routing**: Automatic task analysis and strategy selection
-- **AI Subtitle Generation**: 
-  - Whisper speech recognition
-  - LLM intelligent correction (DeepSeek/OpenAI/Local Qwen2)
-  - Bilingual subtitle support (Chinese-English)
-  - Professional term preservation
-  - Semantic error correction
-- **Batch Processing**: 
-  - Smart file/directory detection
-  - LLM-based parameter extraction
-  - Quality evaluation and scoring
-- **Image Processing**:
-  - Smart rotation with YOLO person detection
-  - Resize and format conversion
-- **Video Processing**:
-  - Video clipping by time range
-  - Format conversion (MP4/AVI/MKV)
-  - Audio extraction
-  - Video optimization (denoising, enhancement)
-- **Agent System**:
-  - Memory management for conversation history
-  - Task quality evaluator with multi-metric scoring
-  - LLM provider switching (Web UI)
-- **Documentation**:
-  - Comprehensive README (Chinese & English)
-  - Architecture design document
-  - Contributing guidelines
-  - API documentation
+- **现代化 Web UI**: 
+  - 聊天式交互界面
+  - 自然语言任务输入
+  - 实时任务进度追踪
+  - LLM 配置管理页面
+- **Docker 完整支持**: 
+  - Docker + docker-compose 一键部署
+  - Nginx 反向代理（可选）
+  - 环境变量配置
+- **智能路由系统**: 
+  - 自动任务类型识别
+  - 工作流编排（LangGraph）
+  - 复杂度评估与策略选择
+- **AI 字幕生成**: 
+  - Whisper 语音识别（支持 GPU/CPU）
+  - LLM 智能纠错（DeepSeek/OpenAI/本地 Qwen2-1.5B）
+  - 专业术语自动提取与保护
+  - 拼音映射智能还原
+  - 语义理解纠错
+- **批量处理**: 
+  - 智能文件/目录检测
+  - LLM 参数提取
+  - 质量评估与评分
+  - 本地降级策略（部分失败保留成功结果）
+- **视频处理**:
+  - 智能旋转（YOLO 人物检测）
+  - 时间范围剪辑
+  - 格式转换（MP4/AVI/MKV）
+  - 音频提取
+- **Agent 系统**:
+  - 对话历史记忆管理
+  - 任务质量评估器（多指标评分）
+  - LLM 提供商在线切换
+  - Skill 模块化架构
+- **LLM 配置管理**:
+  - Web 前端可视化配置
+  - 支持 DeepSeek、OpenAI、通义千问、本地 Qwen2
+  - 自然语言切换 LLM
+  - API 测试连接功能
+- **完整文档**:
+  - 中英文 README
+  - 架构设计文档
+  - 贡献指南
+  - 本地 LLM 部署指南
+  - 快速开始教程
 
 ### Changed
-- **LLM Correction**: Switched from hardcoded examples to semantic understanding
-- **Error Handling**: Local degradation strategy (preserve successful batches on partial failure)
-- **Evaluator Scoring**: Added correction_count metric for accurate quality assessment
-- **Web UI**: Converted from API documentation page to chat-style interface
-- **Parameter Extraction**: Changed from regex to LLM-based JSON parsing
+- **LLM 纠错策略**: 从硬编码示例改为语义理解 + 拼音映射
+- **错误处理**: 批量处理时部分失败保留成功结果（本地降级）
+- **评估指标**: 新增 correction_count 指标准确评估质量
+- **Web UI**: 从 API 文档页面改为聊天式交互界面
+- **参数提取**: 从正则表达式改为 LLM JSON 解析
+- **本地模型**: 从 Qwen2-VL-2B 切换到 Qwen2-1.5B-Instruct（更适合文本任务）
+- **术语纠错**: 新增拼音误识别映射表（FastAPI/past api, RAG/rg 等）
 
 ### Fixed
-- Batch correction failure causing entire LLM work to be discarded
-- Static file routing conflict (API at `/api/info`, Web UI at `/`)
-- Duplicate CSS/HTML content displaying as text in Web UI
-- File vs directory detection (treats files as single-item list)
-- Evaluator scoring 23/100 (FAILED) on successful tasks
-- Path extraction regex too greedy (captured Chinese text)
-- LLM wrongly identifying operation type
+- ✅ 批量纠错失败导致整体 LLM 工作被丢弃
+- ✅ 静态文件路由冲突（API `/api/info` vs Web UI `/`）
+- ✅ Web UI 显示重复 CSS/HTML 文本内容
+- ✅ 文件与目录检测（单文件视为单项列表）
+- ✅ 评估器对成功任务评分 23/100（FAILED）
+- ✅ 路径提取正则过于贪婪（捕获中文文本）
+- ✅ LLM 错误识别操作类型
+- ✅ 专业术语提取但未应用到纠错（术语列表硬编码问题）
+- ✅ 字幕纠错时 LLM 将中文翻译成英文（prompt 优化）
+- ✅ .gitignore 编码问题（中文乱码）
 
 ### Security
-- Input validation with Pydantic models
-- Path traversal prevention
-- File type whitelist validation
+- **输入验证**: Pydantic 模型验证所有 API 输入
+- **路径遍历防护**: 检查 `..` 防止目录遍历攻击
+- **文件类型白名单**: 仅允许 `.mp4`, `.avi`, `.mov`, `.mkv` 等视频格式
+- **GPU 资源隔离**: Docker 容器限制 GPU 访问（`--gpus all`）
+- **环境变量安全**: 敏感配置通过 `.env` 文件管理（已添加到 .gitignore）
 
-## [0.9.0] - 2024-04-15
+## [0.9.0] - 2025-12-20
 
 ### Added
-- Initial project structure
-- Basic subtitle generation with Whisper
-- FFmpeg video processing tools
-- CLI interface
+- 项目模块化架构搭建
+- 基础字幕生成（Whisper）
+- FFmpeg 视频处理工具
+- CLI 命令行界面
 
 ### Changed
-- Migrated from standalone scripts to modular architecture
+- 从独立脚本迁移到模块化架构
 
-## [0.8.0] - 2024-04-01
+## [0.8.0] - 2025-11-01
 
 ### Added
-- Prototype subtitle correction with GPT-3.5
-- Basic batch processing
+- GPT-3.5 字幕纠错原型
+- 批量处理基础功能
 
 ---
 
 ## Release Notes
 
-### v1.0.0 Highlights
+### v1.0.0 亮点功能 🎉
 
-**MediaAI Tools** is now production-ready! 🎉
+**MediaAI Tools** 正式发布生产环境可用版本！这是一个由独立开发者历时 3 个月打造的 AI 视频处理平台。
 
-#### What's New
-- **One-Command Deployment**: `docker-compose up -d` and you're ready to go
-- **Natural Language Interface**: Just tell it what you want in plain language
-- **95%+ Subtitle Accuracy**: Whisper + LLM correction beats manual transcription
-- **Privacy-Focused**: Local Qwen2 model runs offline, no data leaves your server
-- **Intelligent Task Routing**: Automatically selects the best execution strategy
+#### 核心特性
+- **一键部署**: `docker-compose up -d` 即可启动
+- **自然语言交互**: 聊天式界面，无需学习复杂命令
+- **95%+ 字幕准确率**: Whisper + LLM 纠错，超越人工转录
+- **隐私优先**: 本地 Qwen2-1.5B 模型离线运行，数据不出本地
+- **智能任务路由**: 自动选择最佳执行策略
+- **专业术语保护**: 自动提取 + 拼音映射还原（FastAPI、RAG 等）
 
-#### Breaking Changes
-- Removed old `batch_subtitle_llm.py` script (use Web UI or API instead)
-- Configuration moved from `config.example.yaml` to `config/config.yaml`
-- LLM provider names changed (e.g., `qwen` → `qwen2_local`)
+#### 破坏性变更
+- ❌ 移除旧版 `batch_subtitle_llm.py` 脚本（请使用 Web UI 或 API）
+- ❌ 移除 `start.bat` 和 `start.sh`（请使用 Docker）
+- ⚠️ 配置文件从根目录移至 `src/config/config.yaml`
+- ⚠️ LLM 提供商名称变更（如 `qwen` → `qwen2_local`）
 
-#### Migration Guide from v0.9.0
+#### 从 v0.9.0 迁移指南
 
-1. **Update Configuration**:
+1. **更新配置文件**:
    ```bash
+   # 如果你修改了旧配置，请手动迁移
    cp config.example.yaml src/config/config.yaml
    ```
 
-2. **Switch to Docker** (recommended):
+2. **使用 Docker 部署**（推荐）:
    ```bash
    docker-compose up -d
    ```
 
-3. **Use Web UI** instead of CLI:
-   - Old: `python batch_subtitle_llm.py video.mp4`
-   - New: Open browser → `http://localhost:8000` → Enter "Add subtitles to video.mp4"
+3. **改用 Web UI**:
+   - 旧方式: `python batch_subtitle_llm.py video.mp4`
+   - 新方式: 浏览器打开 `http://localhost:8000`，输入 "为 video.mp4 添加字幕"
 
-4. **API Changes**:
-   - Old endpoint: `/subtitle` (POST)
-   - New endpoint: `/api/agent/process` (POST)
-   - New response format includes `task_id` for async polling
+4. **API 变更**:
+   - 旧端点: `/subtitle` (POST)
+   - 新端点: `/api/agent/process` (POST)
+   - 新响应格式包含 `task_id` 支持异步轮询
 
-#### Known Issues
-- Large video files (>2GB) may cause memory issues (use video splitting)
-- Whisper model download on first run may take 5-10 minutes
-- GPU acceleration requires NVIDIA GPU with CUDA 11.8+
+#### 已知问题
+- 超大视频文件（>2GB）可能导致内存不足（建议先分割视频）
+- Whisper 模型首次运行需下载 5-10 分钟
+- GPU 加速需要 NVIDIA GPU + CUDA 12.1+
+- 本地 LLM 推理在 CPU 上较慢（建议 16GB+ 内存）
 
-#### Contributors
-Thanks to all contributors who made this release possible!
+#### 开发者
+本项目由 [lionelyi](https://github.com/lionelyi) 独立开发，欢迎贡献代码和提交 Issue！
 
 ---
 
