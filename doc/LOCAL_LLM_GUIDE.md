@@ -43,7 +43,7 @@ python test_local_llm.py
 
 ### 3. 配置文件说明
 
-配置文件: [code/config/config.yaml](code/config/config.yaml)
+配置文件: [src/config/config.yaml](code/config/config.yaml)
 
 ```yaml
 llm:

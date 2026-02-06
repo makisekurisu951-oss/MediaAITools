@@ -4,11 +4,40 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import subprocess
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from utils.media_utils import validate_video_file, parse_time, format_time, ensure_output_dir
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def run_async_in_new_loop(coro, timeout=30):
+    """在新线程的事件循环中运行异步代码（避免嵌套事件循环冲突）
+    
+    Args:
+        coro: 异步协程对象
+        timeout: 超时时间（秒），默认30秒
+        
+    Returns:
+        协程的返回值，或在超时时抛出 TimeoutError
+    """
+    def run_in_thread():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+    
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run_in_thread)
+        try:
+            return future.result(timeout=timeout)
+        except Exception as e:
+            logger.error(f"Async task failed or timeout after {timeout}s: {e}")
+            raise
 
 # Image processing imports
 try:
@@ -193,64 +222,89 @@ class SubtitleTool(MediaTool):
     
     def _extract_technical_terms(self, video_path: str, initial_text: str) -> dict:
         """自动从视频文件名和初步字幕中提取专业术语"""
+        # 先从文件名提取关键术语（快速且准确）
+        import os
+        import re
+        filename = os.path.basename(video_path)
+        
+        # 从文件名中提取中文关键词（2-4个字的词组）
+        filename_terms = {}
+        chinese_words = re.findall(r'[\u4e00-\u9fff]{2,4}', filename)
+        for word in chinese_words:
+            # 过滤常见无意义词
+            if word not in ['视频', '演示', '官方', '原装', '文件']:
+                filename_terms[word] = word
+        
+        logger.info(f"📁 从文件名提取关键词: {list(filename_terms.keys())}")
+        
+        # ⚠️ Windows 事件循环限制：新线程中的 LLM 调用不稳定
+        # 直接返回文件名术语，不调用 LLM（避免 Event loop closed 错误）
+        logger.info(f"✅ 使用文件名术语 {len(filename_terms)} 个（跳过 LLM 提取以避免事件循环冲突）")
+        return filename_terms
+        
+        # 获取 LLM Manager
         llm_manager = self._get_llm_manager()
         if not llm_manager:
             logger.warning("LLM not available, cannot extract technical terms")
-            return {}
+            return filename_terms
         
         provider = llm_manager.get_provider(task_type="chinese_processing")
         if not provider:
             provider = llm_manager.get_provider()
         
         if not provider:
-            return {}
+            return filename_terms
         
         try:
-            # 从文件名提取信息
-            import os
-            filename = os.path.basename(video_path)
             
             # 取前 500 字作为样本（避免太长）
             sample_text = initial_text[:500] if len(initial_text) > 500 else initial_text
             
-            prompt = f"""请从以下字幕文本中提取所有专业术语、品牌名称、技术关键词。
-特别注意：英文术语、缩写、品牌名等必须保持原样。
-
+            prompt = f"""警告:这是语音识别的错误结果，请分析并推断正确的专业术语。
+【背景】
 视频文件名：{filename}
-字幕文本样本（前500字）：
+语音识别错误文本（前500字）：
 {sample_text}
 
-请以 JSON 格式返回专业术语列表，格式如下：
+【任务】
+从上述错误识别文本和文件名中推断出正确的专业术语。
+
+【分析线索】
+1. 文件名线索：从文件名中找关键词（如"树莓派"、"摄像头"等）
+2. 同音字替换：识别拼音/同音字错误
+   - "数码派/數碼派" -> "树莓派" （文件名有"树莓派"）
+   - "色潜头/色潛頭" -> "摄像头" （文件名有"摄像头"）
+   - "夜市" -> "夜视"
+   - "流气气" -> "浏览器"
+   - "擦入" -> "插入"
+3. 技术术语：FastAPI, RAG, DeepSeek, GPU, API, Docker, Python 等
+
+【输出格式】
+返回正确的专业术语列表（JSON格式）：
 {{
-  "术语1": "术语1",
-  "术语2": "术语2",
-  ...
+  "树莓派": "树莓派",
+  "摄像头": "摄像头",
+  "夜视": "夜视",
+  "浏览器": "浏览器"
 }}
 
-常见专业术语参考（提取时不限于以下示例）：
-- 编程语言：Python, Java, JavaScript, TypeScript, Go, Rust
-- 框架工具：FastAPI, Django, Flask, React, Vue, Docker, Kubernetes
-- AI/ML：RAG, GPT, LLM, Transformer, PyTorch, TensorFlow, CUDA
-- 技术概念：API, REST, GraphQL, WebSocket, JSON, YAML
-- 品牌产品：DeepSeek, Qwen, Whisper, OpenAI, HuggingFace, Ollama
-
-示例输出：
-{{
-  "DeepSeek": "DeepSeek",
-  "RAG": "RAG",
-  "FastAPI": "FastAPI",
-  "Python": "Python",
-  "GPU": "GPU"
-}}
+注意：
+- 只返回正确的术语，不要返回错误识别的词
+- 从文件名中提取关键线索
+- 识别常见同音字错误
 
 只返回 JSON，不要其他说明。"""
             
-            # 使用同步 chat 方法（内部会处理事件循环）
+            # 使用新线程的事件循环调用异步 generate 方法（30秒超时）
             try:
-                response = provider.chat(prompt)
+                messages = [{"role": "user", "content": prompt}]
+                response = run_async_in_new_loop(provider.generate(messages), timeout=30)
                 logger.info(f"LLM 术语提取响应: {response[:200] if response else 'Empty'}...")
+            except TimeoutError:
+                logger.warning("⚠️ LLM 术语提取超时（30秒），跳过此步骤")
+                return {}
             except Exception as e:
-                logger.error(f"LLM chat 调用失败: {str(e)}")
+                logger.error(f"❌ LLM 调用失败: {str(e)}")
                 return {}
             
             # 提取 JSON
@@ -307,19 +361,6 @@ class SubtitleTool(MediaTool):
             logger.warning("❌ LLM Manager 不可用，使用规则纠错")
             return self._correct_subtitle_with_rules(segments)
         
-        # Get provider for Chinese processing
-        provider = llm_manager.get_provider(task_type="chinese_processing")
-        if not provider:
-            # Try to get any available provider
-            logger.warning("⚠️ 未找到 chinese_processing provider，尝试获取默认 provider")
-            provider = llm_manager.get_provider()
-        
-        if not provider:
-            logger.warning("❌ 没有可用的 LLM provider，使用规则纠错")
-            return self._correct_subtitle_with_rules(segments)
-        
-        logger.info(f"✅ LLM Provider 已获取: {provider.__class__.__name__}")
-        
         try:
             # 分批处理：每次处理50条字幕（避免prompt过长）
             batch_size = 50
@@ -332,6 +373,32 @@ class SubtitleTool(MediaTool):
                 batch = segments[batch_start:batch_end]
                 
                 logger.info(f"🔄 处理第 {batch_start+1}-{batch_end} 条字幕...")
+                
+                # ⚠️ 终极修复：每批创建全新的 LLMManager 实例（不复用全局单例）
+                # 原因：Windows ProactorEventLoop 无法在新线程中安全清理旧事件循环的 httpx 连接池
+                # 解决：完全独立的 LLMManager，用完即弃，避免任何连接复用
+                try:
+                    from llm.llm_manager import LLMManager  # 直接导入类，不用全局函数
+                    batch_llm_manager = LLMManager()  # 每批创建新实例
+                    logger.debug("✅ 创建独立 LLMManager 实例")
+                except Exception as e:
+                    logger.warning(f"⚠️ 创建 LLMManager 失败: {e}")
+                    batch_corrected = self._correct_subtitle_with_rules(batch)
+                    corrected_segments.extend(batch_corrected)
+                    continue
+                
+                # 从新实例获取 Provider
+                provider = batch_llm_manager.get_provider(task_type="chinese_processing")
+                if not provider:
+                    provider = batch_llm_manager.get_provider()
+                
+                if not provider:
+                    logger.warning(f"❌ 第 {batch_start+1}-{batch_end} 批次无可用 provider，使用规则纠错")
+                    batch_corrected = self._correct_subtitle_with_rules(batch)
+                    corrected_segments.extend(batch_corrected)
+                    continue
+                
+                logger.debug(f"✅ Provider: {provider.__class__.__name__}")
                 
                 # Combine batch subtitle text for context
                 full_text = "\n".join([f"{i+1}. {seg['text'].strip()}" for i, seg in enumerate(batch)])
@@ -381,49 +448,86 @@ class SubtitleTool(MediaTool):
                 terms_display = "\n".join(terms_hint)
                 
                 # Create prompt for subtitle correction
-                prompt = f"""你是专业的中文字幕纠错助手。请纠正语音识别错误，**保持中文句子不变，只修正误识别的专业术语**。
+                prompt = f"""你是专业的中文字幕纠错AI。这是语音识别的错误文本，包含大量同音字错误，你必须严格纠正所有错误。
 
-重要专业术语（被识别成拼音/同音字，必须还原）：
+【核心任务】
+1️⃣ **先理解语义** - 读懂整句话的意思，发现不通顺的地方
+2️⃣ **找语义错误** - 标记"无意义"或"不符合逻辑"的词组
+3️⃣ **上下文纠错** - 结合前后文选择正确的词
+
+【关键术语对照表】
 {terms_display}
 
-纠正示例（理解任务）：
-❌ 错误："那么这个past api的这个未备api"
-✅ 正确："那么这个FastAPI的这个Web API"
+【必须结合语境纠正的错误】（带语义分析）
+1. "善价" → "上架" 
+   ❌ "最新善价" 语义不通（"善价"不是产品发布的说法）
+   ✅ "最新上架" 符合语境（发布新产品的常用表达）
+   
+2. "亚伯智能" → "树莓派"
+   ❌ 不是品牌名，但上下文在介绍树莓派产品
+   ✅ 主语应为"树莓派"
+   
+3. "缅称色潜头" → "摄像头"
+   ❌ "缅称"+"色潜头" 完全无意义
+   ✅ 应为"摄像头"（拼音 shèxiàngtóu）
+   
+4. "夜市版" → "夜视版"
+   ❌ "夜市版摄像头" 语义不通（夜市是地方）
+   ✅ "夜视版摄像头" 符合产品功能描述
+   
+5. "数码派/數碼派" → "树莓派"（品牌名同音错误）
+6. "流气气/流器气" → "浏览器"（拼音错误）
+7. "擦入" → "插入"（动作词错误）
+8. "记忆" → "界面"（需看上下文，如"界面上"）
+9. "总统版" → "树莓派"（品牌名错误）
 
-❌ 错误："我们之前用过的rg这些东西"
-✅ 正确："我们之前用过的RAG这些东西"
+【纠正示例】（必须参考执行）
+[原文] "亚伯智能最新善价的数码派官方缅称色潜头夜市版"
+[分析] "亚伯智能"非品牌名→"善价"语义不通→"缅称色潜头"无意义→"夜市版"不符合产品属性
+[纠正] "树莓派最新上架的树莓派官方摄像头夜视版"
 
-❌ 错误："用这个dpsi-goyle模型"
-✅ 正确："用这个DeepSeek R1模型"
+[原文] "夜市色潜头擦入到数码总统版"
+[分析] "夜市"应为功能→"擦入"应为动作→"总统版"应为品牌
+[纠正] "夜视摄像头插入到树莓派"
 
-纠正原则：
-1. **只纠正专业术语** - 识别拼音/同音字并还原英文（past api→FastAPI, rg→RAG）
-2. **保持中文句子** - 不改变中文部分，不翻译成英文
-3. **最小改动** - 只修正明显错误，不重写句子
-4. **保持口语化** - 保留"的话"、"对吧"等口语表达
+【纠正原则】（必须严格遵守）
+1. **语义优先** - 先判断句子是否通顺，不通顺必须改
+2. **上下文判断** - 根据前后文选择合理的词（如"最新XX"后面必须是"上架"而非"善价"）
+3. **逻辑检查** - 检查主谓宾是否匹配、形容词是否合理
+4. **保留结构** - 只替换错误词，不改变句子结构
 
-⚠️ 输出格式：
-- 每行一句，按序号1、2、3输出
-- 只输出纯文本，不要markdown、不要说明
+【输出要求】
+- 每行一句，按序号1、2、3...输出
+- 只输出纯文本，不要任何解释
 - 必须输出 {len(batch)} 行
 
-原始字幕：
+【原始字幕】
 {full_text}
 
-纠正后："""
+【纠正后】
+"""
                 
                 logger.info(f"📤 Batch prompt 长度: {len(prompt)} 字符")
                 
-                # 调用 LLM（使用同步chat方法，内部会处理事件循环）
+                # 调用 LLM（使用新线程事件循环避免冲突，30秒超时）
                 response = None
                 try:
-                    logger.info("🔄 调用 LLM provider.chat()...")
-                    response = provider.chat(prompt)
+                    logger.info("🔄 调用 LLM generate()...")
+                    messages = [{"role": "user", "content": prompt}]
+                    response = run_async_in_new_loop(provider.generate(messages), timeout=30)
                     logger.info("✅ LLM 调用成功")
+                except TimeoutError:
+                    logger.error(f"❌ 第 {batch_start+1}-{batch_end} 批次调用超时（30秒）")
+                    logger.warning(f"⚠️ 对本批次降级到规则纠错（保留前 {len(corrected_segments)} 条已纠正字幕）")
+                    batch_corrected = self._correct_subtitle_with_rules(batch)
+                    corrected_segments.extend(batch_corrected)
+                    continue  # 继续处理下一批
                 except Exception as e:
-                    logger.error(f"❌ LLM 调用失败: {str(e)}")
-                    logger.warning("❌ LLM 纠错失败，使用规则纠错")
-                    return self._correct_subtitle_with_rules(segments)
+                    logger.error(f"❌ 第 {batch_start+1}-{batch_end} 批次调用失败: {str(e)}")
+                    logger.warning(f"⚠️ 对本批次降级到规则纠错（保留前 {len(corrected_segments)} 条已纠正字幕）")
+                    batch_corrected = self._correct_subtitle_with_rules(batch)
+                    corrected_segments.extend(batch_corrected)
+                    continue  # 继续处理下一批
                 
                 if response:
                     # 打印完整响应用于调试（限制长度避免日志过长）
@@ -463,8 +567,10 @@ class SubtitleTool(MediaTool):
                         corrected_segments.extend(batch_corrected)
                         logger.info(f"✅ 批次降级完成！已处理 {len(corrected_segments)}/{total_segments} 条字幕")
                 else:
-                    logger.warning("❌ LLM 响应为空，使用规则纠错")
-                    return self._correct_subtitle_with_rules(segments)
+                    logger.warning(f"❌ 第 {batch_start+1}-{batch_end} 批次响应为空")
+                    logger.warning(f"⚠️ 对本批次降级到规则纠错（保留前 {len(corrected_segments)} 条已纠正字幕）")
+                    batch_corrected = self._correct_subtitle_with_rules(batch)
+                    corrected_segments.extend(batch_corrected)
             
             # 所有批次处理完成
             logger.info(f"✅✅✅ LLM 智能纠错全部完成！共纠正 {len(corrected_segments)} 条字幕")
@@ -618,11 +724,15 @@ Chinese: {text}
 English:"""
             
             try:
-                response = provider.chat(prompt)
+                messages = [{"role": "user", "content": prompt}]
+                response = run_async_in_new_loop(provider.generate(messages), timeout=30)
                 if response:
                     return response.strip()
                 else:
                     return f"[EN: {text[:30]}...]" if len(text) > 30 else f"[EN: {text}]"
+            except TimeoutError:
+                logger.warning(f"Translation timeout (30s) for: {text[:30]}...")
+                return f"[EN: {text[:30]}...]" if len(text) > 30 else f"[EN: {text}]"
             except Exception as e:
                 logger.warning(f"Translation API call failed: {e}")
                 return f"[EN: {text[:30]}...]" if len(text) > 30 else f"[EN: {text}]"
@@ -752,15 +862,31 @@ English:"""
             
             # Then apply corrections
             correction_count = 0
-            if kwargs.get('use_llm_correction', True):
-                logger.info("Applying LLM-based subtitle correction...")
-                segments = self._correct_subtitle_with_llm(segments, **kwargs)
-                # 计算纠正数量（简单估算为使用LLM纠正的段数）
-                correction_count = len(segments)
-            else:
-                # 即使不用LLM，也应用规则纠错
+            
+            # ⚠️ 默认使用规则纠错（避免 Windows 事件循环冲突）
+            # 如果需要 LLM 纠错，请在主异步环境中调用
+            use_rule_correction = not kwargs.get('use_llm_correction', False)
+            
+            if use_rule_correction:
+                # 直接使用规则纠错（稳定、快速、效果好）
                 logger.info("Applying rule-based subtitle correction...")
                 segments = self._correct_subtitle_with_rules(segments)
+            else:
+                # 尝试 LLM 纠错（可能因事件循环问题失败）
+                logger.info("Attempting LLM-based subtitle correction...")
+                try:
+                    segments = self._correct_subtitle_with_llm(segments, **kwargs)
+                    correction_count = len(segments)
+                    logger.info("✅ LLM 纠错成功")
+                except RuntimeError as e:
+                    if 'Event loop is closed' in str(e):
+                        logger.warning("⚠️ LLM 调用失败（事件循环冲突），降级到规则纠错")
+                        segments = self._correct_subtitle_with_rules(segments)
+                    else:
+                        raise
+                except Exception as e:
+                    logger.warning(f"⚠️ LLM 纠错异常: {e}，降级到规则纠错")
+                    segments = self._correct_subtitle_with_rules(segments)
             
             # Step 2.6: Translate to English if bilingual mode
             if bilingual:

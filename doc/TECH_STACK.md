@@ -13,7 +13,7 @@
 **功能：**
 - ✅ LLM 消息格式化（HumanMessage, AIMessage, SystemMessage）
 - ✅ 多个 LLM 提供商统一接口（OpenAI, DeepSeek, 通义千问）
-- ✅ 本地模型集成（Qwen2-VL）
+- ✅ 本地模型集成（Qwen2-1.5B）
 - ✅ 对话历史管理
 
 ### 2. **LangGraph** 

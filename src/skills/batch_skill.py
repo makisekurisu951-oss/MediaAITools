@@ -33,7 +33,7 @@ class BatchSkill(BaseSkill):
         logger.info(f"BatchSkill processing: {user_input}")
         
         # Extract parameters from user input
-        params = self._extract_batch_parameters(user_input)
+        params = await self._extract_batch_parameters(user_input)
         
         if not params.get("directory"):
             return {
@@ -131,7 +131,7 @@ class BatchSkill(BaseSkill):
         
         return aggregated_result
     
-    def _extract_batch_parameters(self, user_input: str) -> Dict[str, Any]:
+    async def _extract_batch_parameters(self, user_input: str) -> Dict[str, Any]:
         """Use LLM to extract parameters from user input"""
         params = {}
         
@@ -139,6 +139,14 @@ class BatchSkill(BaseSkill):
         try:
             from llm import get_llm_manager
             llm_manager = get_llm_manager()
+            
+            # ⚠️ 关键修复：重新加载 LLMManager 以避免 httpx 连接池绑定到已关闭的事件循环
+            try:
+                llm_manager.reload()
+                logger.debug("🔄 已重新加载 LLMManager（清除旧连接）")
+            except Exception as e:
+                logger.warning(f"⚠️ 重新加载 LLMManager 失败: {e}")
+            
             provider = llm_manager.get_provider(task_type="chinese_processing")
             if not provider:
                 provider = llm_manager.get_provider()
@@ -175,11 +183,12 @@ class BatchSkill(BaseSkill):
   "operation": "操作类型"
 }}"""
 
-                response = provider.chat(prompt)
+                # 使用异步调用 LLM
+                messages = [{"role": "user", "content": prompt}]
+                response = await provider.generate(messages)
                 
                 # 解析JSON
                 import json
-                import re
                 
                 # 清理响应（去除代码块标记）
                 cleaned_response = response.strip()
@@ -313,7 +322,7 @@ class BatchSkill(BaseSkill):
                 "output_path": str(output_file),
                 "embed_subtitle": True,  # 将字幕流嵌入mp4，原地替换源文件
                 "language": params.get("language", "zh"),
-                "use_llm_correction": True,
+                "use_llm_correction": True,  # 启用 LLM 纠错（通用性更好）
                 "bilingual": params.get("bilingual", False)
             }
         elif operation == "convert":

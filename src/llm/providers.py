@@ -91,6 +91,7 @@ class OpenAIProvider(BaseLLMProvider):
                 model=self.model,
                 api_key=self.api_key,
                 base_url=self.base_url,
+                timeout=60,  # 60秒超时
                 **self.kwargs
             )
         return self._client
@@ -99,6 +100,9 @@ class OpenAIProvider(BaseLLMProvider):
         """Generate response using OpenAI"""
         if not LANGCHAIN_AVAILABLE or HumanMessage is None:
             raise ImportError("langchain_core is not installed. Install it with: pip install langchain-core")
+        
+        # ⚠️ 每次调用前清除缓存，避免事件循环冲突
+        self._client = None
         
         client = self.get_client()
         langchain_messages = []
@@ -127,6 +131,7 @@ class DeepSeekProvider(BaseLLMProvider):
                 model=self.model,
                 api_key=self.api_key,
                 base_url=self.base_url or "https://api.deepseek.com/v1",
+                timeout=60,  # 60秒超时
                 **self.kwargs
             )
         return self._client
@@ -135,6 +140,9 @@ class DeepSeekProvider(BaseLLMProvider):
         """Generate response using DeepSeek"""
         if not LANGCHAIN_AVAILABLE or HumanMessage is None:
             raise ImportError("langchain_core is not installed. Install it with: pip install langchain-core")
+        
+        # ⚠️ 每次调用前清除缓存，避免事件循环冲突
+        self._client = None
         
         client = self.get_client()
         langchain_messages = []
@@ -164,6 +172,7 @@ class QwenProvider(BaseLLMProvider):
                 model=self.model,
                 api_key=self.api_key,
                 base_url=self.base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                timeout=60,  # 60秒超时
                 **self.kwargs
             )
         return self._client
@@ -172,6 +181,26 @@ class QwenProvider(BaseLLMProvider):
         """Generate response using Qwen"""
         if not LANGCHAIN_AVAILABLE or HumanMessage is None:
             raise ImportError("langchain_core is not installed. Install it with: pip install langchain-core")
+        
+        # ⚠️ 重要：每次调用前清除缓存，避免使用已关闭事件循环的客户端
+        # 原因：分批次调用时，每次在新线程+新事件循环中运行
+        # 如果复用客户端，会引用已关闭的事件循环导致 RuntimeError
+        if self._client is not None:
+            try:
+                # 尝试关闭旧客户端的连接（确保 httpx 连接池被清理）
+                if hasattr(self._client, '_client') and hasattr(self._client._client, 'aclose'):
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # 已在事件循环中，直接关闭
+                            await self._client._client.aclose()
+                    except:
+                        pass  # 忽略关闭错误
+            except:
+                pass  # 忽略所有错误
+        
+        self._client = None
         
         client = self.get_client()
         langchain_messages = []

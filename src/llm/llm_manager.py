@@ -68,7 +68,7 @@ class LLMManager:
                             api_key=api_key,
                             model=openai_config.get("model", "gpt-4o"),
                             base_url=openai_config.get("base_url"),
-                            temperature=0.7
+                            temperature=0.1  # 纠错任务需要高度确定性
                         )
                     except Exception:
                         pass  # Skip if initialization fails
@@ -83,7 +83,7 @@ class LLMManager:
                             api_key=api_key,
                             model=deepseek_config.get("model", "deepseek-chat"),
                             base_url=deepseek_config.get("base_url"),
-                            temperature=0.7
+                            temperature=0.1  # 纠错任务需要高度确定性
                         )
                     except Exception:
                         pass
@@ -96,9 +96,9 @@ class LLMManager:
                     try:
                         self.providers["qwen"] = QwenProvider(
                             api_key=api_key,
-                            model=qwen_config.get("model", "qwen-turbo"),
+                            model=qwen_config.get("model", "qwen-plus"),  # qwen-plus 语义理解更强
                             base_url=qwen_config.get("base_url"),
-                            temperature=0.7
+                            temperature=0.1  # 纠错任务需要高度确定性
                         )
                     except Exception:
                         pass
