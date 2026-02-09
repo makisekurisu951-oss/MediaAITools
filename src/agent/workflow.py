@@ -66,11 +66,67 @@ def plan_execution(state: AgentState) -> AgentState:
 
 def execute_tools(state: AgentState) -> AgentState:
     """执行工具调用"""
-    # 这里会调用 MCP Server 的工具
+    from mcp_server import MediaMCPServer
+    from utils.logger import get_logger
+    
+    logger = get_logger(__name__)
     state["current_step"] = "executing"
     
-    # 实际执行逻辑由 MCP Server 处理
-    # 这里只是规划
+    # 实际调用 MCP Server 工具
+    task_type = state.get("task_type")
+    video_paths = state.get("video_paths", [])
+    instruction = state.get("instruction", "")
+    
+    if not video_paths:
+        # 尝试从指令中提取视频路径
+        import re
+        path_pattern = r'([A-Za-z]:[\\//][^"<>|*?\n]+\.(mp4|avi|mov|mkv|wmv|flv|webm))'
+        match = re.search(path_pattern, instruction, re.IGNORECASE)
+        if match:
+            video_paths = [match.group(1)]
+    
+    if not video_paths:
+        state["error"] = "No video file found"
+        return state
+    
+    # 根据任务类型调用相应工具
+    mcp_server = MediaMCPServer()
+    results = []
+    
+    try:
+        for video_path in video_paths:
+            if task_type == "subtitle":
+                # 调用字幕生成工具
+                # 检测语言
+                language = "en"  # 默认英文
+                if "中文" in instruction or "中文" in instruction or "汉语" in instruction:
+                    language = "zh"
+                elif "英文" in instruction or "英语" in instruction or "english" in instruction.lower():
+                    language = "en"
+                
+                result = mcp_server.call_tool(
+                    "generate_subtitle",
+                    video_path=video_path,
+                    language=language
+                )
+                results.append(result)
+            elif task_type == "clip":
+                # 调用视频剪辑工具（需要提取时间参数）
+                result = mcp_server.call_tool(
+                    "clip_video",
+                    input_path=video_path,
+                    start_time="00:00:00",
+                    end_time="00:00:10",
+                    output_path=video_path.replace(".mp4", "-clip.mp4")
+                )
+                results.append(result)
+            # 可以添加更多任务类型
+        
+        state["results"] = results
+        logger.info(f"Workflow executed {len(results)} tasks")
+    except Exception as e:
+        logger.error(f"Workflow execution failed: {e}")
+        state["error"] = str(e)
     
     return state
 

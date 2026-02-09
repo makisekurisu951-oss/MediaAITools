@@ -140,12 +140,8 @@ class BatchSkill(BaseSkill):
             from llm import get_llm_manager
             llm_manager = get_llm_manager()
             
-            # ⚠️ 关键修复：重新加载 LLMManager 以避免 httpx 连接池绑定到已关闭的事件循环
-            try:
-                llm_manager.reload()
-                logger.debug("🔄 已重新加载 LLMManager（清除旧连接）")
-            except Exception as e:
-                logger.warning(f"⚠️ 重新加载 LLMManager 失败: {e}")
+            # ⚠️ 不要调用 reload()！Provider 会自动清理旧的客户端
+            # llm_manager.reload() 会导致事件循环错误
             
             provider = llm_manager.get_provider(task_type="chinese_processing")
             if not provider:
@@ -159,9 +155,10 @@ class BatchSkill(BaseSkill):
 
 【任务】
 从上述指令中提取以下参数，以JSON格式返回：
-- directory: 完整的目录路径（必须从指令中提取，保持原始格式）
+- directory: 完整的目录或文件路径（必须从指令中提取，保持原始格式）
 - recursive: 是否包含子目录（只有明确提到"子目录"或"recursive"才为true，否则一律false）
-- bilingual: 是否生成双语字幕（只有明确提到"双语"、"bilingual"、"中英"、"英文"才为true，否则一律false）
+- bilingual: 是否生成双语字幕（只有明确提到"双语"、"bilingual"、"中英"才为true，否则一律false）
+- language: 字幕语言（"中文/中文/汉语" → "zh"，"英文/英语/english" → "en"，未提及时不返回此字段）
 - operation: 操作类型，严格按以下规则判断：
   * 如果提到"字幕"、"subtitle"、"转录"、"添加字幕" → subtitle
   * 如果提到"剪辑"、"clip"、"裁剪"、"截取" → clip
@@ -170,7 +167,7 @@ class BatchSkill(BaseSkill):
   * 默认：subtitle
 
 【重要提示】
-1. directory必须从用户指令中原样提取，不要使用任何示例路径
+1. directory必须从用户指令中原样提取（可以是文件或目录），不要使用任何示例路径
 2. 路径分隔符保持用户输入的格式（\\ 或 /）
 3. operation只能是subtitle、clip、convert、optimize之一，不要包含中文
 4. 只返回JSON对象，不要添加任何解释
@@ -180,6 +177,7 @@ class BatchSkill(BaseSkill):
   "directory": "提取的实际路径",
   "recursive": true或false,
   "bilingual": true或false,
+  "language": "zh或en（仅当明确提到时）",
   "operation": "操作类型"
 }}"""
 
@@ -240,8 +238,16 @@ class BatchSkill(BaseSkill):
         # Check if recursive (子目录)
         params["recursive"] = "子目录" in user_input or "recursive" in user_input.lower()
         
-        # Check if bilingual (双语)
-        params["bilingual"] = any(word in user_input for word in ["双语", "bilingual", "中英", "英文"])
+        # Check if bilingual (双语) - 只在明确提到"双语"或"中英"时为 true
+        params["bilingual"] = any(word in user_input for word in ["双语", "bilingual", "中英"])
+        
+        # Detect language (语言) - 只在明确提到时设置
+        user_input_lower = user_input.lower()
+        if any(word in user_input_lower for word in ["中文", "中文", "汉语"]):
+            params["language"] = "zh"
+        elif any(word in user_input_lower for word in ["英文", "英语", "english"]):
+            params["language"] = "en"
+        # 否则不设置 language，使用 SubtitleTool 的默认值（en）
         
         # Detect operation type
         if "字幕" in user_input or "subtitle" in user_input.lower():
@@ -321,10 +327,12 @@ class BatchSkill(BaseSkill):
                 "video_path": str(video_file),
                 "output_path": str(output_file),
                 "embed_subtitle": True,  # 将字幕流嵌入mp4，原地替换源文件
-                "language": params.get("language", "zh"),
                 "use_llm_correction": True,  # 启用 LLM 纠错（通用性更好）
                 "bilingual": params.get("bilingual", False)
             }
+            # 只有明确指定语言时才传递，否则使用 SubtitleTool 的默认值（en）
+            if "language" in params:
+                tool_params["language"] = params["language"]
         elif operation == "convert":
             # FormatTool uses input_path, output_format, output_path
             output_format = params.get("output_format", "mp4")  # 默认转mp4

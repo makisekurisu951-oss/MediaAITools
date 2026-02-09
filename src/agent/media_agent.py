@@ -166,16 +166,36 @@ Always be helpful, accurate, and provide detailed explanations of what you're do
         """使用 LangGraph 工作流执行或智能路由到合适的Skill"""
         import re
         from pathlib import Path
+        import os
         
         # 使用传入的user_input作为指令
         instruction = user_input
         
         logger.info(f"Workflow处理指令: {instruction}")
         
-        # 检测是否包含目录路径 - 如果是批量处理任务，路由到BatchSkill
-        path_pattern = r'([A-Za-z]:\\(?:[^\s]+)?目录|[A-Za-z]:\\[^\s]+)'
-        if re.search(path_pattern, instruction) or "目录" in instruction or "批量" in instruction:
-            logger.info("检测到批量处理任务，路由到BatchSkill")
+        # 检测是否是批量处理任务（目录路径或明确提到批量/目录）
+        is_batch = False
+        
+        # 方法1: 明确提到"目录"或"批量"
+        if "目录" in instruction or "批量" in instruction:
+            is_batch = True
+            logger.info("检测到批量关键词（目录/批量），路由到BatchSkill")
+        else:
+            # 方法2: 提取路径并检查是否为目录（排除 .mp4/.avi 等文件）
+            path_pattern = r'([A-Za-z]:[\\//][^"<>|*?\n]+)'
+            path_matches = re.findall(path_pattern, instruction)
+            for path_str in path_matches:
+                path_str = path_str.strip().rstrip('\\/')
+                # 排除明确的文件路径（有常见视频扩展名）
+                if re.search(r'\.(mp4|avi|mov|mkv|wmv|flv|webm)$', path_str, re.IGNORECASE):
+                    continue
+                # 检查是否为实际存在的目录
+                if os.path.isdir(path_str):
+                    is_batch = True
+                    logger.info(f"检测到目录路径: {path_str}，路由到BatchSkill")
+                    break
+        
+        if is_batch:
             
             # 使用BatchSkill处理
             from skills.batch_skill import BatchSkill
@@ -183,7 +203,26 @@ Always be helpful, accurate, and provide detailed explanations of what you're do
             result = await batch_skill.execute(instruction, context)
             return result
         
-        # 否则使用LangGraph工作流
+        # 对于单个文件的简单任务，直接路由到对应的 Skill
+        # 检查是否是单个文件的字幕任务
+        task_type = route_result.task_type.value if hasattr(route_result.task_type, 'value') else str(route_result.task_type)
+        
+        if task_type == "subtitle":
+            # 单个文件字幕任务，直接使用 SubtitleSkill
+            from skills.subtitle_skill import SubtitleSkill
+            subtitle_skill = SubtitleSkill()
+            logger.info("检测到单个文件字幕任务，路由到SubtitleSkill")
+            result = await subtitle_skill.execute(instruction, context)
+            return result
+        elif task_type == "clip":
+            # 单个文件剪辑任务
+            from skills.clip_skill import ClipSkill
+            clip_skill = ClipSkill()
+            logger.info("检测到单个文件剪辑任务，路由到ClipSkill")
+            result = await clip_skill.execute(instruction, context)
+            return result
+        
+        # 其他复杂任务使用 LangGraph 工作流
         from .workflow import run_workflow
         
         logger.info("使用工作流编排执行")

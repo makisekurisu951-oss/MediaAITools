@@ -167,23 +167,29 @@ class IntelligentRouter:
         
         # 选择得分最高的任务类型
         max_task = max(scores.items(), key=lambda x: x[1])
-        confidence = min(max_task[1] / 3.0, 1.0)  # 归一化到 0-1
+        # 优化置信度计算：至少0.6，避免单个关键词就被判为低置信度
+        # 1个关键词 -> 0.6, 2个 -> 0.8, 3个+ -> 1.0
+        confidence = min(0.6 + (max_task[1] - 1) * 0.2, 1.0)
         
         return max_task[0], confidence
     
     def _is_complex_task(self, instruction: str) -> bool:
         """检测是否为复杂任务"""
+        # 检查是否包含明确的复杂任务模式（先...然后、并且、同时等）
         for pattern in self.complex_patterns:
             if re.search(pattern, instruction):
                 return True
         
-        # 检查是否包含多个任务类型
-        task_count = 0
-        for patterns in self.keyword_patterns.values():
+        # 检查是否包含多个**不同**的任务类型
+        matched_tasks = set()
+        for task_type, patterns in self.keyword_patterns.items():
             if any(re.search(p, instruction.lower()) for p in patterns):
-                task_count += 1
+                matched_tasks.add(task_type)
         
-        return task_count > 1
+        # 只有匹配到2个或以上不同的任务类型才算复杂任务
+        # 例如："添加字幕并转换格式" (subtitle + format) = 复杂
+        # "添加英文字幕" (只有 subtitle) = 简单
+        return len(matched_tasks) > 1
     
     def _select_strategy(
         self, 
@@ -192,23 +198,27 @@ class IntelligentRouter:
         confidence: float
     ) -> RouteStrategy:
         """选择路由策略"""
-        # 复杂任务使用工作流
+        # 未知任务使用智能体
+        if task_type == TaskType.UNKNOWN:
+            return RouteStrategy.AGENT
+        
+        # 极低置信度(<0.3)优先使用智能体，即使看起来复杂
+        if confidence < 0.3:
+            return RouteStrategy.AGENT
+        
+        # 复杂任务使用工作流（但置信度需要>=0.3）
         if is_complex:
             return RouteStrategy.WORKFLOW
         
-        # 低置信度任务使用智能体
+        # 低置信度任务(0.3-0.5)使用智能体
         if confidence < 0.5:
-            return RouteStrategy.AGENT
-        
-        # 未知任务使用智能体
-        if task_type == TaskType.UNKNOWN:
             return RouteStrategy.AGENT
         
         # 简单明确的任务直接调用工具
         if confidence >= 0.7:
             return RouteStrategy.DIRECT_TOOL
         
-        # 中等置信度使用技能
+        # 中等置信度(0.5-0.7)使用技能
         return RouteStrategy.SKILL
     
     def _determine_target(
